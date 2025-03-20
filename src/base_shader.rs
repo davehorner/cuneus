@@ -4,15 +4,12 @@ use egui::ViewportId;
 use crate::gst::video::VideoTextureManager;
 use std::path::Path;
 use log::{warn, info, error};
-use crate::{
-    Core, Renderer, TextureManager, UniformProvider, UniformBinding,
-    KeyInputHandler, ExportManager, ShaderControls, ControlsRequest, ResolutionUniform,
-};
+use crate::spectrum::SpectrumAnalyzer;
+use crate::{Core, Renderer, TextureManager, UniformProvider, UniformBinding,KeyInputHandler,ExportManager,ShaderControls,ControlsRequest,ResolutionUniform};
 #[cfg(target_os = "macos")]
 pub const CAPTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 #[cfg(not(target_os = "macos"))]
 pub const CAPTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
-
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct TimeUniform {
@@ -43,6 +40,7 @@ pub struct BaseShader {
     pub controls: ShaderControls,
     // Global auto animation toggle (disabled by default)
     pub auto_animation: bool,
+    pub spectrum_analyzer: SpectrumAnalyzer,
 }
 
 impl BaseShader {
@@ -96,7 +94,10 @@ impl BaseShader {
             "Resolution Uniform",
             ResolutionUniform {
                 dimensions: [core.size.width as f32, core.size.height as f32],
-                _padding: [0.0; 2],
+                _padding: [0.0, 0.0],
+                audio_data: [[0.0; 4]; 32],
+                bpm: 0.0,
+                _bpm_padding: [0.0, 0.0, 0.0],
             },
             &resolution_bind_group_layout,
             0,
@@ -184,6 +185,7 @@ impl BaseShader {
             key_handler: KeyInputHandler::new(),
             export_manager: ExportManager::new(),
             controls: ShaderControls::new(),
+            spectrum_analyzer: SpectrumAnalyzer::new(),
             auto_animation: false, // Auto animation is off by default.
         }
     }
@@ -469,7 +471,14 @@ impl BaseShader {
         }
         self.controls.apply_ui_request(request);
     }
-    
+    pub fn update_audio_spectrum(&mut self, queue: &wgpu::Queue) {
+        self.spectrum_analyzer.update_spectrum(
+            queue,
+            &mut self.resolution_uniform,
+            &self.video_texture_manager,
+            self.using_video_texture,
+        );
+    }
     pub fn handle_video_requests(&mut self, core: &Core, request: &ControlsRequest) {
         if let Some(path) = &request.load_media_path {
             if let Err(e) = self.load_media(core, path) {
@@ -509,7 +518,6 @@ impl BaseShader {
                 let _ = vm.set_mute(muted);
             }
         }
-        
         if request.toggle_mute {
             if let Some(vm) = &mut self.video_texture_manager {
                 let _ = vm.toggle_mute();

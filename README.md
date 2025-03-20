@@ -11,6 +11,7 @@ A tool for experimenting with WGSL shaders, it uses `wgpu` for rendering, `egui`
 - Multi-pass, atomics etc
 - Interactive parameter adjustment, ez Texture loading through egui
 - Easily use your own videos as textures (thanks to the `gstreamer`)
+- Audio/Visual synchronization: Spectrum and BPM detection via `gstreamer`
 - Export HQ frames via egui
 
 
@@ -52,14 +53,14 @@ A tool for experimenting with WGSL shaders, it uses `wgpu` for rendering, `egui`
 | <a href="https://github.com/user-attachments/assets/4f1f0cc0-12a5-4158-90e1-ac205fa2d28a"><img src="https://github.com/user-attachments/assets/4f1f0cc0-12a5-4158-90e1-ac205fa2d28a" width="250"/></a><br/>[Code](https://github.com/altunenes/cuneus/blob/main/src/bin/xmas.rs) | <a href="https://github.com/user-attachments/assets/ffe1e193-9a9a-4784-8193-177d6b8648af"><img src="https://github.com/user-attachments/assets/ffe1e193-9a9a-4784-8193-177d6b8648af" width="250"/></a><br/>[Code](https://github.com/altunenes/cuneus/blob/main/src/bin/droste.rs) | <a href="https://github.com/user-attachments/assets/42868686-bad9-4ce3-b5bd-346d880c8540"><img src="https://github.com/user-attachments/assets/42868686-bad9-4ce3-b5bd-346d880c8540" width="250"/></a><br/>[Code](https://github.com/altunenes/cuneus/blob/main/src/bin/clifford.rs) |
 
 
-| **orbits** | **dna** | **genuary6** |
+| **orbits** | **hilbert room** | **genuary6** |
 |:---:|:---:|:---:|
-| <a href="https://github.com/user-attachments/assets/8aadd685-e11b-4929-809b-61c950fc2a3d"><img src="https://github.com/user-attachments/assets/8aadd685-e11b-4929-809b-61c950fc2a3d" width="250"/></a><br/>[Code](https://github.com/altunenes/cuneus/blob/main/src/bin/orbits.rs) | <a href="https://github.com/user-attachments/assets/fe88f9e3-de98-4b03-a3d5-e3219632a6df"><img src="https://github.com/user-attachments/assets/fe88f9e3-de98-4b03-a3d5-e3219632a6df" width="250"/></a><br/>[Code](https://github.com/altunenes/cuneus/blob/main/src/bin/dna.rs) | <a href="https://github.com/user-attachments/assets/be2e132a-a473-462d-8b5b-2277336c7e78"><img src="https://github.com/user-attachments/assets/be2e132a-a473-462d-8b5b-2277336c7e78" width="250"/></a><br/>[Code](https://github.com/altunenes/cuneus/blob/main/src/bin/genuary2025_6.rs) |
+| <a href="https://github.com/user-attachments/assets/54dcd781-30af-46fb-aeda-2d2d607b0742"><img src="https://github.com/user-attachments/assets/951b30d6-6f8d-4fc7-884f-eec496fb3885" width="250"/></a><br/>[Code](https://github.com/altunenes/cuneus/blob/main/src/bin/orbits.rs) | <a href="https://github.com/user-attachments/assets/bc596e6b-9304-48ba-b509-140544450f5d"><img src="https://github.com/user-attachments/assets/bc596e6b-9304-48ba-b509-140544450f5d" width="250"/></a><br/>[Code](https://github.com/altunenes/cuneus/blob/main/src/bin/hilbert.rs) | <a href="https://github.com/user-attachments/assets/be2e132a-a473-462d-8b5b-2277336c7e78"><img src="https://github.com/user-attachments/assets/be2e132a-a473-462d-8b5b-2277336c7e78" width="250"/></a><br/>[Code](https://github.com/altunenes/cuneus/blob/main/src/bin/genuary2025_6.rs) |
 
 
-| **rorschach** | **nebula** | **genuary18** |
+| **rorschach** | **nebula** | **audio visualizer** |
 |:---:|:---:|:---:|
-| <a href="https://github.com/user-attachments/assets/320c977d-1e64-4e44-9a8c-03779b70f025"><img src="https://github.com/user-attachments/assets/320c977d-1e64-4e44-9a8c-03779b70f025" width="250"/></a><br/>[Code](https://github.com/altunenes/cuneus/blob/main/src/bin/rorschach.rs) | <a href="https://github.com/user-attachments/assets/5f230955-4115-4695-955c-8df2d4bba5af"><img src="https://github.com/user-attachments/assets/26d4b3a4-f9b5-45df-b43a-160e00520bfe" width="250"/></a><br/>[Code](https://github.com/altunenes/cuneus/blob/main/src/bin/nebula.rs) | <a href="https://github.com/user-attachments/assets/262a6e12-b2ba-4dee-b1de-66e7045145f5"><img src="https://github.com/user-attachments/assets/262a6e12-b2ba-4dee-b1de-66e7045145f5" width="250"/></a><br/>[Code](https://github.com/altunenes/cuneus/blob/main/src/bin/genuary2025_18.rs) |
+| <a href="https://github.com/user-attachments/assets/320c977d-1e64-4e44-9a8c-03779b70f025"><img src="https://github.com/user-attachments/assets/320c977d-1e64-4e44-9a8c-03779b70f025" width="250"/></a><br/>[Code](https://github.com/altunenes/cuneus/blob/main/src/bin/rorschach.rs) | <a href="https://github.com/user-attachments/assets/5f230955-4115-4695-955c-8df2d4bba5af"><img src="https://github.com/user-attachments/assets/26d4b3a4-f9b5-45df-b43a-160e00520bfe" width="250"/></a><br/>[Code](https://github.com/altunenes/cuneus/blob/main/src/bin/nebula.rs) | <a href="https://github.com/user-attachments/assets/3eda9c33-7961-4dd4-aad1-170ae32640e7"><img src="https://github.com/user-attachments/assets/3eda9c33-7961-4dd4-aad1-170ae32640e7" width="250"/></a><br/>[Code](https://github.com/altunenes/cuneus/blob/main/src/bin/audiovis.rs) |
 
 | **Poe2:loading** | **tree** | **voronoi** |
 |:---:|:---:|:---:|

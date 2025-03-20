@@ -5,14 +5,15 @@ use std::path::PathBuf;
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct ShaderParams {
-    lambda: f32,
-    theta: f32,
-    alpha: f32,
-    sigma: f32,
+    red_power: f32,
+    green_power: f32,
+    blue_power: f32,
+    green_boost: f32,
+    contrast: f32,
     gamma: f32,
-    blue: f32,
-    use_texture_colors: f32,
+    glow:f32,
 }
+
 impl UniformProvider for ShaderParams {
     fn as_bytes(&self) -> &[u8] {
         bytemuck::bytes_of(self)
@@ -20,12 +21,14 @@ impl UniformProvider for ShaderParams {
 }
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     cuneus::gst::init()?;
+    //std::env::set_var("RUST_LOG", "info,gstreamer=debug,cuneus=debug");
     env_logger::init();
-    let (app, event_loop) = ShaderApp::new("Spiral", 800, 600);
-    let shader = SpiralShader::init(app.core());
+    //std::env::set_var("GST_DEBUG", "bpmdetect:5,pitch:5,soundtouch:5,bus:4,element:4");
+    let (app, event_loop) = ShaderApp::new("audiovis", 800, 600);
+    let shader = AudioVis::init(app.core());
     app.run(event_loop, shader)
 }
-struct SpiralShader {
+struct AudioVis {
     base: BaseShader,
     params_uniform: UniformBinding<ShaderParams>,
     hot_reload: ShaderHotReload,
@@ -34,7 +37,8 @@ struct SpiralShader {
     resolution_bind_group_layout: wgpu::BindGroupLayout,
     params_bind_group_layout: wgpu::BindGroupLayout,
 }
-impl SpiralShader {
+impl AudioVis {
+
     fn capture_frame(&mut self, core: &Core, time: f32) -> Result<Vec<u8>, wgpu::SurfaceError> {
         let settings = self.base.export_manager.settings();
         let (capture_texture, output_buffer) = self.base.create_capture_texture(
@@ -71,7 +75,6 @@ impl SpiralShader {
             });
             render_pass.set_pipeline(&self.base.renderer.render_pipeline);
             render_pass.set_vertex_buffer(0, self.base.renderer.vertex_buffer.slice(..));
-            
             if self.base.using_video_texture {
                 if let Some(video_manager) = &self.base.video_texture_manager {
                     render_pass.set_bind_group(0, &video_manager.texture_manager().bind_group, &[]);
@@ -79,11 +82,8 @@ impl SpiralShader {
             } else if let Some(texture_manager) = &self.base.texture_manager {
                 render_pass.set_bind_group(0, &texture_manager.bind_group, &[]);
             }
-            // Time (group 1)
             render_pass.set_bind_group(1, &self.base.time_uniform.bind_group, &[]);
-            // Params (group 2)
             render_pass.set_bind_group(2, &self.params_uniform.bind_group, &[]);
-            // Resolution (group 3)
             render_pass.set_bind_group(3, &self.base.resolution_uniform.bind_group, &[]);
             render_pass.draw(0..4, 0..1);
         }
@@ -167,7 +167,7 @@ impl SpiralShader {
         }
     }
 }
-impl ShaderManager for SpiralShader {
+impl ShaderManager for AudioVis {
     fn init(core: &cuneus::Core) -> Self {
         let time_bind_group_layout = core.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[wgpu::BindGroupLayoutEntry {
@@ -208,21 +208,24 @@ impl ShaderManager for SpiralShader {
             }],
             label: Some("params_bind_group_layout"),
         });
+        
         let params_uniform = UniformBinding::new(
             &core.device,
             "Params Uniform",
             ShaderParams {
-                lambda: 35.0,
-                theta: 0.7,
-                alpha: 0.7,
-                sigma: 0.1,
-                gamma: 0.1,
-                blue: 0.1,
-                use_texture_colors: 0.0,
+                red_power: 0.98,
+                green_power: 0.85,
+                blue_power: 0.90,
+                green_boost: 1.62,
+                contrast: 1.0,
+                gamma: 1.0,
+                glow: 0.05,
+
             },
             &params_bind_group_layout,
             0,
         );
+        
         let texture_bind_group_layout = core.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[
                 wgpu::BindGroupLayoutEntry {
@@ -245,10 +248,10 @@ impl ShaderManager for SpiralShader {
             label: Some("texture_bind_group_layout"),
         });
         let bind_group_layouts = vec![
-            &texture_bind_group_layout,    // group 0
-            &time_bind_group_layout,       // group 1 
-            &params_bind_group_layout,     // group 2
-            &resolution_bind_group_layout, // group 3
+            &texture_bind_group_layout,
+            &time_bind_group_layout,
+            &params_bind_group_layout,
+            &resolution_bind_group_layout,
         ];
         let vs_module = core.device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Vertex Shader"),
@@ -257,12 +260,12 @@ impl ShaderManager for SpiralShader {
 
         let fs_module = core.device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Fragment Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../../shaders/spiral.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../../shaders/audiovis.wgsl").into()),
         });
 
         let shader_paths = vec![
             PathBuf::from("shaders/vertex.wgsl"),
-            PathBuf::from("shaders/spiral.wgsl"),
+            PathBuf::from("shaders/audiovis.wgsl"),
         ];
 
         let hot_reload = ShaderHotReload::new(
@@ -274,7 +277,7 @@ impl ShaderManager for SpiralShader {
         let base = BaseShader::new(
             core,
             include_str!("../../shaders/vertex.wgsl"),
-            include_str!("../../shaders/spiral.wgsl"),
+            include_str!("../../shaders/audiovis.wgsl"),
             &bind_group_layouts,
             None,
         );
@@ -295,10 +298,10 @@ impl ShaderManager for SpiralShader {
             let pipeline_layout = core.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
                 bind_group_layouts: &[
-                    &self.texture_bind_group_layout,    // group 0
-                    &self.time_bind_group_layout,       // group 1
-                    &self.resolution_bind_group_layout, // group 2
-                    &self.params_bind_group_layout,     // group 3
+                    &self.texture_bind_group_layout,
+                    &self.time_bind_group_layout,
+                    &self.params_bind_group_layout,
+                    &self.resolution_bind_group_layout,
                 ],
                 push_constant_ranges: &[],
             });
@@ -315,14 +318,13 @@ impl ShaderManager for SpiralShader {
             self.handle_export(core);
         }
     }
+    
     fn render(&mut self, core: &Core) -> Result<(), wgpu::SurfaceError> {
         let output = core.surface.get_current_texture()?;
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
         if self.base.using_video_texture {
             self.base.update_video_texture(core, &core.queue);
         }
-        let mut params = self.params_uniform.data;
-        let mut changed = false;
         let mut should_start_export = false;
         let mut export_request = self.base.export_manager.get_ui_request();
         let mut controls_request = self.base.controls.get_ui_request(
@@ -335,40 +337,31 @@ impl ShaderManager for SpiralShader {
             self.base.render_ui(core, |ctx| {
                 ctx.style_mut(|style| {
                     style.visuals.window_fill = egui::Color32::from_rgba_premultiplied(0, 0, 0, 180);
-                });                egui::Window::new("Shader Settings").show(ctx, |ui| {
-                    ShaderControls::render_media_panel(
-                        ui,
-                        &mut controls_request,
-                        using_video_texture,
-                        video_info
-                    );
-                    
-                    ui.separator();
-                    
-                    ui.collapsing("Spiral Parameters", |ui| {
-                        changed |= ui.add(egui::Slider::new(&mut params.lambda, 1.0..=360.0).text("Lambda")).changed();
-                        changed |= ui.add(egui::Slider::new(&mut params.theta, -6.2..=6.2).text("Theta")).changed();
-                        changed |= ui.add(egui::Slider::new(&mut params.alpha, 0.0..=1.0).text("Alpha")).changed();
-                        changed |= ui.add(egui::Slider::new(&mut params.sigma, 0.0..=1.0).text("Sigma")).changed();
-                        changed |= ui.add(egui::Slider::new(&mut params.gamma, 0.0..=1.0).text("Gamma")).changed();
-                        changed |= ui.add(egui::Slider::new(&mut params.blue, 0.0..=1.0).text("Blue")).changed();
-                        
-                        let mut use_texture = params.use_texture_colors > 0.5;
-                        if ui.checkbox(&mut use_texture, "Use Texture Colors").changed() {
-                            changed = true;
-                            params.use_texture_colors = if use_texture { 1.0 } else { 0.0 };
-                        }
-                    });
-                    
-                    ui.separator();
-                    ShaderControls::render_controls_widget(ui, &mut controls_request);
-                    ui.separator();
-                    should_start_export = ExportManager::render_export_ui_widget(ui, &mut export_request);
                 });
+                egui::Window::new("vis")
+                    .collapsible(true)
+                    .default_size([300.0, 100.0])
+                    .show(ctx, |ui| {
+                        ui.collapsing("Media", |ui: &mut egui::Ui| {
+                            ShaderControls::render_media_panel(
+                                ui,
+                                &mut controls_request,
+                                using_video_texture,
+                                video_info
+                            );
+                        });
+    
+                        ui.separator();
+                        ui.separator();
+                        ShaderControls::render_controls_widget(ui, &mut controls_request);
+                        ui.separator();
+                        should_start_export = ExportManager::render_export_ui_widget(ui, &mut export_request);
+                    });
             })
         } else {
             self.base.render_ui(core, |_ctx| {})
         };
+        
         self.base.export_manager.apply_ui_request(export_request);
         self.base.apply_control_request(controls_request.clone());
         self.base.handle_video_requests(core, &controls_request);
@@ -376,13 +369,15 @@ impl ShaderManager for SpiralShader {
         let current_time = self.base.controls.get_time(&self.base.start_time);
         self.base.time_uniform.data.time = current_time;
         self.base.time_uniform.update(&core.queue);
-        if changed {
-            self.params_uniform.data = params;
-            self.params_uniform.update(&core.queue);
-        }
+        // FOR AUIDO SPECTRUM WE NEED TO UPDATE THE AUDIO SPECTRUM ON here. 
+        self.base.update_audio_spectrum(&core.queue); 
+
+
+        
         if should_start_export {
             self.base.export_manager.start_export();
         }
+        
         let mut encoder = core.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         });
@@ -411,11 +406,8 @@ impl ShaderManager for SpiralShader {
             } else if let Some(texture_manager) = &self.base.texture_manager {
                 render_pass.set_bind_group(0, &texture_manager.bind_group, &[]);
             }
-            // Time (group 1)
             render_pass.set_bind_group(1, &self.base.time_uniform.bind_group, &[]);
-            // Params (group 2)
             render_pass.set_bind_group(2, &self.params_uniform.bind_group, &[]);
-            // Resolution (group 3)
             render_pass.set_bind_group(3, &self.base.resolution_uniform.bind_group, &[]);
             render_pass.draw(0..4, 0..1);
         }
@@ -424,9 +416,11 @@ impl ShaderManager for SpiralShader {
         output.present();
         Ok(())
     }
+    
     fn resize(&mut self, core: &Core) {
         self.base.update_resolution(&core.queue, core.size);
     }
+    
     fn handle_input(&mut self, core: &Core, event: &WindowEvent) -> bool {
         if self.base.egui_state.on_window_event(core.window(), event).consumed {
             return true;
