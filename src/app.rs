@@ -84,7 +84,7 @@ impl<S: ShaderManager> ApplicationHandler for ShaderAppHandler<S> {
         event: WindowEvent,
     ) {
         // Only process events if core and shader are initialized
-        if let (Some(core), Some(shader)) = (&self.app.core, &mut self.shader) {
+        if let (Some(core), Some(shader)) = (&mut self.app.core, &mut self.shader) {
             if window_id == core.window().id() {
                 if !shader.handle_input(core, &event) {
                     match event {
@@ -92,10 +92,8 @@ impl<S: ShaderManager> ApplicationHandler for ShaderAppHandler<S> {
                             event_loop.exit();
                         }
                         WindowEvent::Resized(size) => {
-                            if let Some(core) = &mut self.app.core {
-                                core.resize(size);
-                                shader.resize(core);
-                            }
+                            core.resize(size);
+                            shader.resize(core); // Ensure shader accounts for resize
                         }
                         WindowEvent::RedrawRequested => {
                             shader.update(core);
@@ -106,12 +104,17 @@ impl<S: ShaderManager> ApplicationHandler for ShaderAppHandler<S> {
                                     }
                                 }
                                 Err(wgpu::SurfaceError::Lost) => {
-                                    if let Some(core) = &mut self.app.core {
-                                        core.resize(core.size);
-                                    }
+                                    core.resize(core.size);
+                                    shader.resize(core); // Handle resize after surface is lost
                                 }
                                 Err(wgpu::SurfaceError::OutOfMemory) => event_loop.exit(),
-                                Err(e) => eprintln!("Render error: {:?}", e),
+                                Err(e) => { 
+                                    eprintln!("Render error: {:?}", e);
+                                         if let Some(shader_creator) = self.shader_creator.take() {
+                                                    let shader = shader_creator(core);
+                                                    self.shader = Some(shader);
+                                                }
+                                }
                             }
                         }
                         _ => {}

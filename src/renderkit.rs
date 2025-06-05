@@ -494,6 +494,7 @@ impl RenderKit {
         if request.should_reset {
             self.start_time = Instant::now();
         }
+
         self.controls.apply_ui_request(request);
     }
     pub fn update_audio_spectrum(&mut self, queue: &wgpu::Queue) {
@@ -523,8 +524,15 @@ impl RenderKit {
             let _ = self.seek_video(0.0);
             let _ = self.play_video();
         }
-        
-        if let Some(position) = request.seek_position {
+          if request.request_random_seek {
+            if let Some(video_manager) = &mut self.video_texture_manager {
+                if let Some(duration) = video_manager.duration() {
+                    let random_position = rand::random::<f64>() * duration.seconds() as f64;
+                    self.start_time = Instant::now() - std::time::Duration::from_secs_f64(random_position);
+                    let _ = self.seek_video(random_position);
+                }
+            }
+        } else if let Some(position) = request.seek_position {
             let _ = self.seek_video(position);
         }
         

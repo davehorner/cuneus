@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 use crate::gst::video::VideoTextureManager;
 use crate::hdri::HdriMetadata;
+use egui::was_tooltip_open_last_frame;
+use rand::Rng; // Import the random number generator
 #[derive(Clone)]
 pub struct ControlsRequest {
     pub is_paused: bool,
@@ -27,11 +29,18 @@ pub struct ControlsRequest {
     // HDRI reqs
     pub hdri_exposure: Option<f32>,
     pub hdri_gamma: Option<f32>,
+
+    // Random seek request
+    pub request_random_seek: bool, // Add a flag for random seek requests
 }
 impl Default for ControlsRequest {
     fn default() -> Self {
         let mut default_media = None;
         let mut should_play_video=false;
+        let mut request_random_seek = false; // Initialize the flag to false
+        if let Ok(media_dir) = std::env::var("CUNEUS_RANDOM") {
+            request_random_seek=true;
+        }
         if let Ok(media_dir) = std::env::var("CUNEUS_MEDIA") {
             println!("CUNEUS_MEDIA: {}", media_dir);
             if media_dir.starts_with('"') && media_dir.ends_with('"') {
@@ -67,6 +76,9 @@ impl Default for ControlsRequest {
             // HDRI-related stuff
             hdri_exposure: None,
             hdri_gamma: None,
+
+            // Random seek request
+            request_random_seek, // Initialize the flag to false
         }
     }
 }
@@ -123,6 +135,7 @@ impl ShaderControls {
     pub fn get_ui_request(&mut self, start_time: &std::time::Instant, size: &winit::dpi::PhysicalSize<u32>) -> ControlsRequest {
         let mut load_media_path = None;
         let mut play_video = false;
+                 let mut request_random_seek = false; // Initialize the flag to false
         if !self.media_loaded_once {
             if let Ok(media_dir) = std::env::var("CUNEUS_MEDIA") {
                 println!("CUNEUS_MEDIA: {}", media_dir);
@@ -134,6 +147,9 @@ impl ShaderControls {
                 }
                 play_video = true;
                 self.media_loaded_once = true; // Mark as loaded
+            }
+            if let Ok(media_dir) = std::env::var("CUNEUS_RANDOM") {
+                request_random_seek=true;
             }
         }
         ControlsRequest {
@@ -156,6 +172,8 @@ impl ShaderControls {
 
             hdri_exposure: None,
             hdri_gamma: None,
+
+            request_random_seek,
         }
     }
     
@@ -175,6 +193,16 @@ impl ShaderControls {
             self.pause_start = None;
         }
         self.is_paused = request.is_paused;
+
+        if request.request_random_seek {
+            if let Some(duration) = request.current_time {
+                if let Some(random_position) = self.set_random_seek_position(duration) {
+                    println!("Random seek position set to: {:.2}", random_position);
+                } else  {
+                    println!("Failed to set random seek position: duration is zero or negative");
+                }
+            }
+        }
     }
 
     /// Extract video info from a video texture manager
@@ -357,5 +385,15 @@ impl ShaderControls {
                 });
             }
         });
+    }
+
+    pub fn set_random_seek_position(&mut self, duration: f32) -> Option<f64> {
+        if duration > 0.0 {
+            let mut rng = rand::rng(); // Use the updated `rng` function
+            let random_position = rng.random_range(0.0..duration) as f64; // Use `random_range` instead of `gen_range`
+            Some(random_position)
+        } else {
+            None
+        }
     }
 }
