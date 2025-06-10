@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 #[cfg(feature = "media")]
 use crate::gst::video::VideoTextureManager;
-use crate::hdri::HdriMetadata;
+use crate::{hdri::HdriMetadata, media::download_youtube_video};
 #[derive(Clone)]
 pub struct ControlsRequest {
     pub is_paused: bool,
@@ -125,16 +125,57 @@ impl ShaderControls {
         let mut load_media_path = None;
         let mut play_video = false;
         if !self.media_loaded_once {
+            let mut default_media = None;
+            let mut should_play_video = false;
             if let Ok(media_dir) = std::env::var("CUNEUS_MEDIA") {
-                println!("CUNEUS_MEDIA: {}", media_dir);
-                if media_dir.starts_with('"') && media_dir.ends_with('"') {
-                    let unquoted = &media_dir[1..media_dir.len() - 1];
-                    load_media_path = Some(PathBuf::from(unquoted));
+            println!("CUNEUS_MEDIA: {}", media_dir);
+            let media_dir_is_quoted = media_dir.starts_with('"') && media_dir.ends_with('"');
+            let media_dir_for_path = if media_dir_is_quoted {
+                &media_dir[1..media_dir.len() - 1]
+            } else {
+                &media_dir
+            };
+            println!("[DEBUG] media_dir_for_path: {}", media_dir_for_path);
+            // Detect if the media_dir is a YouTube URL
+            if media_dir_for_path.starts_with("http://") || media_dir_for_path.starts_with("https://") {
+                // Try to extract the YouTube video ID and start time
+                let video_id = media_dir_for_path.split("v=").nth(1).and_then(|s| s.split('&').next());
+                // Try to extract the t= (start), end= (end time in seconds), and duration= (duration in seconds) parameters
+                let start_time = media_dir_for_path.split("t=").nth(1)
+                .and_then(|s| s.split('&').next())
+                .and_then(|t| t.trim_end_matches('s').parse::<u64>().ok());
+                let end_time = media_dir_for_path.split("end=").nth(1)
+                .and_then(|s| s.split('&').next())
+                .and_then(|t| t.trim_end_matches('s').parse::<u64>().ok());
+                let duration = media_dir_for_path.split("duration=").nth(1)
+                .and_then(|s| s.split('&').next())
+                .and_then(|d| d.trim_end_matches('s').parse::<u64>().ok());
+                println!("[DEBUG] Detected YouTube URL. video_id: {:?}, start_time: {:?}, end_time: {:?}, duration: {:?}", video_id, start_time, end_time, duration);
+                if let Some(video_id) = video_id {
+                    // Find the actual downloaded file in the media directory, but only use it if start_time and end_time match the filename
+                    let media_dir = std::path::Path::new("media");
+                    println!("[DEBUG] Downloading YouTube video to media directory");
+                    match download_youtube_video(video_id, media_dir, start_time, end_time, duration) {
+                        Ok(path) => default_media = Some(path),
+                        Err(e) => {
+                            println!("[ERROR] Failed to download or process YouTube video: {}", e);
+                            default_media = None;
+                        }
+                    }
+                    should_play_video = true;
                 } else {
-                    load_media_path = Some(PathBuf::from(media_dir));
+                // If not a valid YouTube URL, do not set default_media
+                println!("[DEBUG] Not a valid YouTube URL, skipping default_media assignment.");
+                default_media = None;
                 }
-                play_video = true;
-                self.media_loaded_once = true;
+            } else {
+                println!("[DEBUG] Using local media path: {}", media_dir_for_path);
+                default_media = Some(PathBuf::from(media_dir_for_path));
+                should_play_video = true;
+            }
+            load_media_path = default_media;
+            play_video = should_play_video;
+            self.media_loaded_once = true;
             }
         }
         ControlsRequest {

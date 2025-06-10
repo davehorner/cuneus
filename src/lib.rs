@@ -32,6 +32,7 @@ mod fps;
 mod mouse;
 pub mod hdri;
 mod font;
+pub mod media;
 
 pub use renderer::*;
 pub use shader::*;
